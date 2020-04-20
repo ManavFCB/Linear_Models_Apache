@@ -138,7 +138,7 @@ public class LinearReg extends Configured implements Tool {
             final Configuration conf = getConf();
             conf.setInt("noi",num_it);
             conf.setDouble("lr",0.01);
-            conf.setDouble("tolerance",0.00001);
+            conf.setDouble("tolerance",0.0001);
             conf.setDouble("prev_error",error);
             String s3_loc="s3n://mr-manav-bucket-1/";
             num_it++;
@@ -189,9 +189,6 @@ public class LinearReg extends Configured implements Tool {
             else{
                 FileSystem.get(new URI(s3_loc),conf).delete(new Path(loc1),true);
             }
-
-            logger.info("the error:"+error);
-
         }
             return 0;
     }
