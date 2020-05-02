@@ -13,9 +13,9 @@ object LogReg {
     val conf = new SparkConf()
     val sc = new SparkContext(conf)
     val tol=0.0001
-    val weights = sc.textFile("s3://mr-manav-bucket-1/weights/weights.txt").map(line=>{
-      val s=line.split(",")
-      (s(0).toInt,s(1).toDouble)
+    var weights = sc.textFile("s3://mr-manav-bucket-1/weights/weights.txt").map(line => {
+      val s = line.split(",")
+      (s(0).toInt, s(1).toDouble)
     }).collect
     var curr_error = Double.PositiveInfinity;
     var flag=0
@@ -52,31 +52,36 @@ object LogReg {
       }).collect()
       val mean_nll=new_error.value/n.value
       logger.info("the mean nll is:"+mean_nll)
+      if(curr_error-mean_nll>tol){
       val nob=n.value
-      if(math.abs(mean_nll-curr_error)>tol && mean_nll<curr_error){
-        var arr=new Array[(Integer,Double)](pgd.length*weights.size)
-        var k=0
-        for(i<- 0 to pgd.length-1){
-          for(t<-0 to pgd(i).keySet.size-1){
-            arr(k)=(t,pgd(i)(t))
-            k=k+1
+        var arr = new Array[(Integer, Double)](pgd.length * weights.size)
+        var k = 0
+        for (i <- 0 to pgd.length - 1) {
+          for (t <- 0 to pgd(i).keySet.size - 1) {
+            arr(k) = (t, pgd(i)(t))
+            k = k + 1
           }
         }
-        var new_wts=sc.parallelize(arr.toSeq).reduceByKey(_+_).map(line=>{
-          val wts=weights_br.value(line._1)
-          (line._1,wts._2-0.2*line._2/nob)
-        }).collect()
-        for(i<-0 to new_wts.length-1){
-          weights(new_wts(i)._1)=(new_wts(i)._1,new_wts(i)._2)
+        val wt_map = new mutable.HashMap[Integer, Double]()
+        for (i <- 0 to weights.length - 1) {
+          wt_map.put(weights(i)._1, weights(i)._2)
         }
-        curr_error=mean_nll
+        val wt_hash = sc.broadcast(wt_map)
+        var new_wts = sc.parallelize(arr.toSeq).reduceByKey(_ + _)
+          val new_weights=new_wts.map(line=>{
+          val wt=wt_hash.value.get(line._1).get
+            (line._1.toInt,wt-0.2*line._2/nob)
+        }).collect()
+          weights=new_weights
+          curr_error=mean_nll
       }
-      else{
+        else {
         val weights_rdd=sc.parallelize(weights)
-       weights_rdd.saveAsTextFile(args(1))
+        weights_rdd.saveAsTextFile(args(1))
         flag=1
       }
       iter+=1;
     }
   }
 }
+
