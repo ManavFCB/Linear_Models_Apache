@@ -107,7 +107,7 @@ public class LinearReg extends Configured implements Tool {
         public void cleanup(Context context) throws IOException,InterruptedException{
             sse=sse/nob;
             double lambda=Double.parseDouble(context.getConfiguration().get("lambda"));
-            for(int i=0;i<weights.size();i++)
+            for(int i=1;i<weights.size();i++)
                 sse+=lambda*Math.pow(weights.get(i),2);
             w="";
             double error=Double.parseDouble(context.getConfiguration().get("prev_error"));
@@ -115,7 +115,10 @@ public class LinearReg extends Configured implements Tool {
             double tolerance=Double.parseDouble(context.getConfiguration().get("tolerance"));
             if (error-sse > tolerance) {
                 for (int i=0;i<weights.size();i++) {
+                    if(i>0)
                     weights.put(i, weights.get(i) - (2.0*lr * w_pgd.get(i)/nob+2.0*lambda*weights.get(i)));
+                    if(i==0)
+                        weights.put(i, weights.get(i) - 2.0*lr * w_pgd.get(i)/nob);
                     if(i<weights.size()-1)
                         w+=weights.get(i)+",";
                     else
