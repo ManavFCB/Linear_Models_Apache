@@ -117,7 +117,7 @@ public class LinearReg extends Configured implements Tool {
                 for (int i=0;i<weights.size();i++) {
                     if(i>0)
                     weights.put(i, weights.get(i) - (2.0*lr * w_pgd.get(i)/nob+2.0*lambda*weights.get(i)));
-                    if(i==0)
+                    else
                         weights.put(i, weights.get(i) - 2.0*lr * w_pgd.get(i)/nob);
                     if(i<weights.size()-1)
                         w+=weights.get(i)+",";
