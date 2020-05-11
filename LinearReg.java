@@ -53,6 +53,7 @@ public class LinearReg extends Configured implements Tool {
 
         public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
             String[] s = value.toString().split("\t");
+            nob+=1;
             double sum = weights.get(0);
             List<Double> weight_op;
             double y = Double.parseDouble(s[0]);
@@ -71,7 +72,6 @@ public class LinearReg extends Configured implements Tool {
             }
             double cost = Math.pow(error, 2);
             sum_error+=cost;
-            nob++;
         }
         public void cleanup(Context context) throws IOException,InterruptedException {
             for (int i = 0; i < weight_up_sums.size(); i++) {
@@ -106,20 +106,22 @@ public class LinearReg extends Configured implements Tool {
         }
         public void cleanup(Context context) throws IOException,InterruptedException{
             sse=sse/nob;
-            logger.info(sse);
+            double lambda=Double.parseDouble(context.getConfiguration().get("lambda"));
+            for(int i=0;i<weights.size();i++)
+                sse+=lambda*Math.pow(weights.get(i),2);
             w="";
             double error=Double.parseDouble(context.getConfiguration().get("prev_error"));
             double lr=Double.parseDouble(context.getConfiguration().get("lr"));
             double tolerance=Double.parseDouble(context.getConfiguration().get("tolerance"));
-            if (Math.abs(sse - error) > tolerance && sse<error) {
+            if (error-sse > tolerance) {
                 for (int i=0;i<weights.size();i++) {
-                    weights.put(i, weights.get(i) - 2.0*lr * w_pgd.get(i)/nob);
+                    weights.put(i, weights.get(i) - (2.0*lr * w_pgd.get(i)/nob+2.0*lambda*weights.get(i)));
                     if(i<weights.size()-1)
                         w+=weights.get(i)+",";
                     else
                         w+=weights.get(i);
                 }
-                context.getCounter(Stats.curr_mse).increment((long)(sse*100000000));
+                context.getCounter(Stats.curr_mse).increment((long)(sse*1000000000));
                 context.write(new Text("weights"),new Text(w));
             } else {
                 context.getCounter(Stats.flag).increment(1);
@@ -137,7 +139,8 @@ public class LinearReg extends Configured implements Tool {
                 error=Double.POSITIVE_INFINITY;
             final Configuration conf = getConf();
             conf.setInt("noi",num_it);
-            conf.setDouble("lr",0.01);
+            conf.setDouble("lambda",0.001);
+            conf.setDouble("lr",0.001);
             conf.setDouble("tolerance",0.0001);
             conf.setDouble("prev_error",error);
             String s3_loc="s3n://mr-manav-bucket-1/";
@@ -176,7 +179,7 @@ public class LinearReg extends Configured implements Tool {
             if (!job.waitForCompletion(true))
                 System.exit(1);
             Counters c=job.getCounters();
-            sum_error=c.findCounter(Stats.curr_mse).getValue()/(double)100000000;
+            sum_error=c.findCounter(Stats.curr_mse).getValue()/(double)1000000000;
             flag=c.findCounter(Stats.flag).getValue();
             if(flag==0)
             {
@@ -195,7 +198,7 @@ public class LinearReg extends Configured implements Tool {
 
     public static void main(final String[] args) {
         if (args.length != 2) {
-            throw new Error("Three arguments required:\n<input-dir> <output1-dir> <output2-dir>");
+            throw new Error("Two arguments required:\n<input-dir> <output1-dir>");
         }
 
         try {
